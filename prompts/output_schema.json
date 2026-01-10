@@ -1,0 +1,8 @@
+{
+  "type": "think | act | done",
+  "content": "string",
+  "tool": {
+    "name": "string",
+    "args": { }
+  }
+}
