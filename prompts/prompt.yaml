@@ -45,4 +45,4 @@ system_prompt: |
   - Do NOT respond with "done" unless the goal is fully satisfied
 
 user_goal: |
-  "Write instructions to change my oil in my car."
+  "Write a recipe that would use my uncooked lamb chops."
