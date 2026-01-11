@@ -33,7 +33,13 @@ def extract_json(text: str) -> dict:
     text = re.sub(r"^```(?:json)?\s*", "", text.strip())
     text = re.sub(r"\s*```$", "", text.strip())
 
-    return json.loads(text)
+    repaired = repair_json(text)
+    return json.loads(repaired)
+
+def repair_json(text: str) -> str:
+    # Remove trailing commas before } or ]
+    text = re.sub(r",\s*(\}|\])", r"\1", text)
+    return text
 
 def log_event(state, event_type, payload):
     state["events"].append({
@@ -89,6 +95,9 @@ History:
     try:
         return extract_json(raw)
     except json.JSONDecodeError:
+        log_event(state, "json_error", raw)
+        run_file = save_run(state)
+        print(f"Run saved to {run_file}")
         raise RuntimeError(f"Invalid JSON from agent:\n{raw}")
 
 def run_agent(goal: str, max_steps=10):
@@ -136,16 +145,19 @@ def run_agent(goal: str, max_steps=10):
             log_event(state, "tool_result", result)
 
         elif output["type"] == "done":
+            log_event(state, "done", output["content"])
             run_file = save_run(state)
             print(f"Run saved to {run_file}")
 
-            log_event(state, "done", output["content"])
             print("\nDONE:")
             print(output["content"])
 
             return output["content"]
 
         else:
+            log_event(state, "done", output['type'])
+            run_file = save_run(state)
+            print(f"Run saved to {run_file}")
             raise RuntimeError(f"Unknown output type: {output['type']}")
 
     raise RuntimeError("Agent exceeded max steps")
