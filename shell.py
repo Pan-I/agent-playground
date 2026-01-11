@@ -1,5 +1,8 @@
 import workflow_tools
 import agent
 
-if __name__ == "__main__":
+def main():
     agent.run_agent(workflow_tools.original_prompt)
+
+if __name__ == "__main__":
+    main()

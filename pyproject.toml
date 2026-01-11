@@ -6,3 +6,6 @@ dependencies = [
     "openai",
     "anthropic"
 ]
+
+[project.scripts]
+agent-shell = "shell:main"

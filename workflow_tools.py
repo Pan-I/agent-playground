@@ -9,19 +9,21 @@ with open('./prompts/prompt.yaml', 'r') as f:
     original_prompt = config['user_goal']
 
 def write_file(path: str, content: str) -> str:
-    with open(path, "w") as f:
+    Path("output").mkdir(exist_ok=True)
+    filename = f"output/{path}"
+
+    if Path(filename).exists():
+        path_obj = Path(path)
+        stem = path_obj.stem
+        suffix = path_obj.suffix
+
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
+        new_filename = f"{stem}_{timestamp}{suffix}"
+        filename = f"output/{new_filename}"
+
+    with open(filename, "w") as f:
         f.write(content)
     return f"Wrote {len(content)} characters to {path}"
-
-TOOLS = {
-    "write_file": {
-        "fn": write_file,
-        "schema": {
-            "path": str,
-            "content": str,
-        }
-    }
-}
 
 def extract_json(text: str) -> dict:
     """
@@ -54,12 +56,47 @@ def normalize_args(tool_name: str, args: dict) -> dict:
             args["path"] = args.pop("filename")
     return args
 
+
 def validate_args(schema: dict, args: dict):
     for key, typ in schema.items():
         if key not in args:
             raise RuntimeError(f"Missing arg: {key}")
-        if not isinstance(args[key], str):
-            raise RuntimeError(f"Arg {key} must be {typ}")
+
+        # Convert string type names to actual types
+        type_map = {
+            "int": int,
+            "str": str,
+            "float": float,
+            "string": str,
+            "bool": bool,
+            "list": list,
+            "dict": dict
+        }
+
+        # Ensure we have an actual type, not a string
+        if isinstance(typ, str):
+            actual_type = type_map.get(typ)
+            if actual_type is None:
+                raise RuntimeError(f"Unknown type string: {typ}")
+        else:
+            actual_type = typ
+
+        # If already the correct type, continue
+        if isinstance(args[key], actual_type):
+            continue
+
+        # If the required type is int and the arg is a string, try to convert
+        if actual_type == int and isinstance(args[key], str):
+            try:
+                args[key] = int(args[key])
+            except ValueError:
+                raise RuntimeError(f"Arg {key} must be int but cannot convert '{args[key]}' to int")
+        else:
+            raise RuntimeError(f"Arg {key} must be {actual_type.__name__} but got {type(args[key]).__name__}")
+
+def merge_prompts(dict1, dict2):
+    merged = {**dict1, **dict2}
+    return merged
 
 def save_run(state):
     Path("runs").mkdir(exist_ok=True)
