@@ -21,8 +21,8 @@ def write_file(path: str, content: str) -> str:
         new_filename = f"{stem}_{timestamp}{suffix}"
         filename = f"output/{new_filename}"
 
-    with open(filename, "w") as f:
-        f.write(content)
+    with open(filename, "w") as f2:
+        f2.write(content)
     return f"Wrote {len(content)} characters to {path}"
 
 def extract_json(text: str) -> dict:
@@ -39,7 +39,7 @@ def extract_json(text: str) -> dict:
 
 def repair_json(text: str) -> str:
     # Remove trailing commas before } or ]
-    text = re.sub(r",\s*(\}|\])", r"\1", text)
+    text = re.sub(r",\s*([}\]])", r"\1", text)
     return text
 
 def log_event(state, event_type, payload):
@@ -101,6 +101,6 @@ def merge_prompts(dict1, dict2):
 def save_run(state):
     Path("runs").mkdir(exist_ok=True)
     filename = f"runs/run_{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')}.json"
-    with open(filename, "w") as f:
-        json.dump(state, f, indent=2)
+    with open(filename, "w") as f3:
+        json.dump(state, f3, indent=2)
     return filename
