@@ -1,11 +1,13 @@
 import json
+from typing import Dict, Any, Optional
+
 import yaml
-from script_files.tools import workflow_tools
-from script_files.tools import search_tools
+
 from script_files.llm_agent_scripts.llm_provider import get_llm_provider
+from script_files.tools import search_tools
+from script_files.tools import workflow_tools
 
-llm = get_llm_provider()
-
+# Standard tools definition
 TOOLS = {
     "write_file": {
         "fn": workflow_tools.write_file,
@@ -25,15 +27,41 @@ TOOLS = {
     }
 }
 
-def agent_step(state) -> dict:
-    with open(workflow_tools.PROMPTS_DIR / "prompt.yaml") as f:
-        prompt = yaml.safe_load(f)
-    with open(workflow_tools.PROMPTS_DIR / "system_prompt.yaml") as f:
-        system_prompt = yaml.safe_load(f)
+# Global LLM provider instance
+llm = get_llm_provider()
 
-    full_prompt = workflow_tools.merge_prompts(system_prompt, prompt)
-    prompt = f"""
-{full_prompt['system_prompt']}
+
+class Agent:
+    def __init__(
+            self,
+            llm_provider=None,
+            tools: Optional[Dict[str, Any]] = None,
+            max_steps: int = 10,
+            max_search: int = 2
+    ):
+        self.llm = llm_provider or llm
+        self.tools = tools or TOOLS
+        self.max_steps = max_steps
+        self.max_search = max_search
+
+        # Load and cache prompts during initialization
+        self.system_prompt = self._load_system_prompt()
+
+    @staticmethod
+    def _load_system_prompt() -> str:
+        """Loads system and user prompts and merges them, extracting the system prompt string."""
+        with open(workflow_tools.PROMPTS_DIR / "prompt.yaml") as f:
+            prompt_data = yaml.safe_load(f)
+        with open(workflow_tools.PROMPTS_DIR / "system_prompt.yaml") as f:
+            system_prompt_data = yaml.safe_load(f)
+
+        full_prompt = workflow_tools.merge_prompts(system_prompt_data, prompt_data)
+        return full_prompt.get('system_prompt', '')
+
+    def _format_prompt(self, state: Dict[str, Any]) -> str:
+        """Formats the prompt for the LLM based on the current state."""
+        return f"""
+{self.system_prompt}
 
 Goal:
 {state['goal']}
@@ -42,83 +70,110 @@ History:
 {state['events']}
 """
 
-    raw = llm.complete(prompt)
+    def step(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Performs a single step of the agent: prompt LLM, extract JSON, and log input."""
+        prompt_text = self._format_prompt(state)
+        raw = self.llm.complete(prompt_text)
 
-    try:
-        workflow_tools.log_event(state, "model_input", raw)
-        return workflow_tools.extract_json(raw)
-    except json.JSONDecodeError:
-        workflow_tools.log_event(state, "json_error", raw)
+        try:
+            workflow_tools.log_event(state, "model_input", raw)
+            return workflow_tools.extract_json(raw)
+        except (json.JSONDecodeError, ValueError):
+            workflow_tools.log_event(state, "json_error", raw)
+            run_file = workflow_tools.save_run(state)
+            print(f"Run saved to {run_file}")
+            raise RuntimeError(f"Invalid JSON from agent:\n{raw}")
+
+    def run(self, goal: str) -> str:
+        """Runs the main agent loop until the goal is achieved or max steps reached."""
+        state = {
+            "goal": goal,
+            "step": 0,
+            "search-count": 0,
+            "events": [],
+            "note": "",
+        }
+
+        for step_idx in range(self.max_steps):
+            state["step"] = step_idx + 1
+            print(f"\n--- Step {state['step']} ---")
+
+            output = self.step(state)
+            workflow_tools.log_event(state, "model_output", output)
+            print(output)
+
+            result = self._process_output(state, output)
+            if result is not None:
+                return result
+
+        raise RuntimeError("Agent exceeded max steps")
+
+    def _process_output(self, state: Dict[str, Any], output: Dict[str, Any]) -> Optional[str]:
+        """Processes the agent's output based on its type."""
+        output_type = output.get("type")
+
+        if output_type == "think":
+            workflow_tools.log_event(state, "think", output.get("content"))
+            return None
+
+        if output_type == "act":
+            self._execute_tool(state, output.get("tool", {}))
+            return None
+
+        if output_type == "done":
+            content = output.get("content")
+            workflow_tools.log_event(state, "done", content)
+            run_file = workflow_tools.save_run(state)
+            print(f"Run saved to {run_file}")
+            print("\nDONE:")
+            print(content)
+            return content
+
+        # Unknown output type
+        workflow_tools.log_event(state, "done", output_type)
         run_file = workflow_tools.save_run(state)
         print(f"Run saved to {run_file}")
-        raise RuntimeError(f"Invalid JSON from agent:\n{raw}")
+        raise RuntimeError(f"Unknown output type: {output_type}")
 
-def run_agent(goal: str, max_steps=10, max_search=2):
-    state = {
-        "goal": goal,
-        "step": 0,
-        "search-count": 0,
-        "events": [],
-        "note" : "",
-    }
+    def _execute_tool(self, state: Dict[str, Any], tool_call: Dict[str, Any]) -> None:
+        """Handles tool selection, argument validation, and execution."""
+        tool_name = tool_call.get("name")
+        args = tool_call.get("args", {})
 
-    for step in range(max_steps):
-        state["step"] = step + 1
-        print(f"\n--- Step {state["step"]} ---")
-        output = agent_step(state)
-        workflow_tools.log_event(state, "model_output", output)
-        print(output)
+        if tool_name not in self.tools:
+            raise RuntimeError(
+                f"Unknown tool: {tool_name}. "
+                f"Tool '{tool_name}' is not allowed. "
+                f"Allowed tools: {list(self.tools.keys())}"
+            )
 
-        if output["type"] == "think":
-            workflow_tools.log_event(state, "think", output["content"])
+        args = workflow_tools.normalize_args(tool_name, args)
 
-        elif output["type"] == "act":
-            tool_name = output["tool"]["name"]
-
-            if tool_name not in TOOLS:
-                raise RuntimeError(
-                    f"Unknown tool: {tool_name}"
-                    f"Tool '{output['tool']['name']}' is not allowed. "
-                    f"Allowed tools: {list(TOOLS.keys())}"
-                )
-
-            args = output["tool"]["args"]
-            args = workflow_tools.normalize_args(tool_name, args)
-
-            if tool_name == "search":
-                state["search-count"] += 1
-
-            if state["search-count"] >= max_search:
+        if tool_name == "search":
+            state["search-count"] += 1
+            if state["search-count"] >= self.max_search:
                 state["note"] = "Runner reporting search engine limit has reached. Please process results."
 
-            workflow_tools.log_event(state, "act", {
-                "tool": tool_name,
-                "args": args,
-            })
+        workflow_tools.log_event(state, "act", {
+            "tool": tool_name,
+            "args": args,
+        })
 
-            tool = TOOLS[tool_name]
-            workflow_tools.validate_args(tool["schema"], args)
-            result = tool["fn"](**args)
+        tool_config = self.tools[tool_name]
+        workflow_tools.validate_args(tool_config["schema"], args)
 
-            workflow_tools.log_event(state, "tool_result", {
-                "tool": tool_name,
-                "result": result,
-            })
+        result = tool_config["fn"](**args)
 
-        elif output["type"] == "done":
-            workflow_tools.log_event(state, "done", output["content"])
-            run_file = workflow_tools.save_run(state)
-            print(f"Run saved to {run_file}")
+        workflow_tools.log_event(state, "tool_result", {
+            "tool": tool_name,
+            "result": result,
+        })
 
-            print("\nDONE:")
-            print(output["content"])
 
-            return output["content"]
+# Functions for backward compatibility
+def agent_step(state) -> dict:
+    return Agent().step(state)
 
-        else:
-            workflow_tools.log_event(state, "done", output['type'])
-            run_file = workflow_tools.save_run(state)
-            print(f"Run saved to {run_file}")
-            raise RuntimeError(f"Unknown output type: {output['type']}")
 
-    raise RuntimeError("Agent exceeded max steps")
+def run_agent(goal: str, max_steps=10, max_search=2):
+    return Agent(max_steps=max_steps, max_search=max_search).run(goal)
