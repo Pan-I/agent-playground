@@ -26,9 +26,9 @@ TOOLS = {
 }
 
 def agent_step(state) -> dict:
-    with open("./prompts/prompt.yaml") as f:
+    with open("../../prompts/prompt.yaml") as f:
         prompt = yaml.safe_load(f)
-    with open("./prompts/system_prompt.yaml") as f:
+    with open("../../prompts/system_prompt.yaml") as f:
         system_prompt = yaml.safe_load(f)
 
     full_prompt = workflow_tools.merge_prompts(system_prompt, prompt)

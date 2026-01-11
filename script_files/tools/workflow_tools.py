@@ -4,12 +4,12 @@ import yaml
 import datetime
 from pathlib import Path
 
-with open('./prompts/prompt.yaml', 'r') as f:
+with open('../../prompts/prompt.yaml', 'r') as f:
     config = yaml.safe_load(f)
     original_prompt = config['user_goal']
 
 def write_file(path: str, content: str) -> str:
-    Path("output").mkdir(exist_ok=True)
+    Path("../../output").mkdir(exist_ok=True)
     filename = f"output/{path}"
 
     if Path(filename).exists():
@@ -99,7 +99,7 @@ def merge_prompts(dict1, dict2):
     return merged
 
 def save_run(state):
-    Path("runs").mkdir(exist_ok=True)
+    Path("../../runs").mkdir(exist_ok=True)
     filename = f"runs/run_{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')}.json"
     with open(filename, "w") as f3:
         json.dump(state, f3, indent=2)

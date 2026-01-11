@@ -1,4 +1,4 @@
-from mock_db import MOCK_DB
+from script_files.mocks.mock_db import MOCK_DB
 
 
 def search(query: str, top_k: int = 7) -> list[dict]:
