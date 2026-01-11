@@ -1,8 +1,8 @@
 import json
 import yaml
-import workflow_tools
-import search_tools
-from llm_provider import get_llm_provider
+from script_files.tools import workflow_tools
+from script_files.tools import search_tools
+from script_files.llm_agent_scripts.llm_provider import get_llm_provider
 
 llm = get_llm_provider()
 
@@ -26,9 +26,9 @@ TOOLS = {
 }
 
 def agent_step(state) -> dict:
-    with open("../../prompts/prompt.yaml") as f:
+    with open(workflow_tools.PROMPTS_DIR / "prompt.yaml") as f:
         prompt = yaml.safe_load(f)
-    with open("../../prompts/system_prompt.yaml") as f:
+    with open(workflow_tools.PROMPTS_DIR / "system_prompt.yaml") as f:
         system_prompt = yaml.safe_load(f)
 
     full_prompt = workflow_tools.merge_prompts(system_prompt, prompt)
@@ -73,15 +73,14 @@ def run_agent(goal: str, max_steps=10, max_search=2):
             workflow_tools.log_event(state, "think", output["content"])
 
         elif output["type"] == "act":
-            if output["tool"]["name"] not in TOOLS:
+            tool_name = output["tool"]["name"]
+
+            if tool_name not in TOOLS:
                 raise RuntimeError(
+                    f"Unknown tool: {tool_name}"
                     f"Tool '{output['tool']['name']}' is not allowed. "
                     f"Allowed tools: {list(TOOLS.keys())}"
                 )
-
-            tool_name = output["tool"]["name"]
-            if tool_name not in TOOLS:
-                raise RuntimeError(f"Unknown tool: {tool_name}")
 
             args = output["tool"]["args"]
             args = workflow_tools.normalize_args(tool_name, args)

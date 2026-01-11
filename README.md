@@ -59,7 +59,12 @@ python shell.py
 python3 shell.py
 ```
 
-To set up the command, add the following to your `pyproject.toml`:
+To set up the command, you will need to have your IDE configuration set up to run the script directly or add the following to your run configuration:
+```
+<option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/script_files"/>
+<option name="SCRIPT_NAME" value="$PROJECT_DIR$/script_files/shell.py"/>
+```
+add the following to your `pyproject.toml`:
 ```
 [project.scripts]
 agent-shell = "shell:main"
@@ -73,7 +78,7 @@ as well as something like the following to your `.vscode/launch.json`, depending
             "name": "Python: Shell",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/shell.py",
+            "program": "${workspaceFolder}/script_files/shell.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }

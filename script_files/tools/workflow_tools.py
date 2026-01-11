@@ -4,22 +4,32 @@ import yaml
 import datetime
 from pathlib import Path
 
-with open('../../prompts/prompt.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-    original_prompt = config['user_goal']
+# Configuration and data paths relative to the project root
+BASE_DIR = Path(__file__).parent.parent.parent
+PROMPTS_DIR = BASE_DIR / "prompts"
+OUTPUT_DIR = BASE_DIR / "output"
+RUNS_DIR = BASE_DIR / "runs"
+
+def _load_config():
+    config_path = PROMPTS_DIR / "prompt.yaml"
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    return {}
+
+config = _load_config()
+original_prompt = config.get('user_goal', '')
 
 def write_file(path: str, content: str) -> str:
-    Path("../../output").mkdir(exist_ok=True)
-    filename = f"output/{path}"
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    filename = OUTPUT_DIR / path
 
-    if Path(filename).exists():
-        path_obj = Path(path)
-        stem = path_obj.stem
-        suffix = path_obj.suffix
+    if filename.exists():
+        stem = filename.stem
+        suffix = filename.suffix
 
         timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-        new_filename = f"{stem}_{timestamp}{suffix}"
-        filename = f"output/{new_filename}"
+        filename = OUTPUT_DIR / f"{stem}_{timestamp}{suffix}"
 
     with open(filename, "w") as f2:
         f2.write(content)
@@ -57,25 +67,24 @@ def normalize_args(tool_name: str, args: dict) -> dict:
     return args
 
 
+TYPE_MAP = {
+    "int": int,
+    "str": str,
+    "float": float,
+    "string": str,
+    "bool": bool,
+    "list": list,
+    "dict": dict
+}
+
 def validate_args(schema: dict, args: dict):
     for key, typ in schema.items():
         if key not in args:
             raise RuntimeError(f"Missing arg: {key}")
 
-        # Convert string type names to actual types
-        type_map = {
-            "int": int,
-            "str": str,
-            "float": float,
-            "string": str,
-            "bool": bool,
-            "list": list,
-            "dict": dict
-        }
-
         # Ensure we have an actual type, not a string
         if isinstance(typ, str):
-            actual_type = type_map.get(typ)
+            actual_type = TYPE_MAP.get(typ)
             if actual_type is None:
                 raise RuntimeError(f"Unknown type string: {typ}")
         else:
@@ -95,12 +104,12 @@ def validate_args(schema: dict, args: dict):
             raise RuntimeError(f"Arg {key} must be {actual_type.__name__} but got {type(args[key]).__name__}")
 
 def merge_prompts(dict1, dict2):
-    merged = {**dict1, **dict2}
-    return merged
+    return {**dict1, **dict2}
 
 def save_run(state):
-    Path("../../runs").mkdir(exist_ok=True)
-    filename = f"runs/run_{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')}.json"
+    RUNS_DIR.mkdir(exist_ok=True)
+    timestamp = datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')
+    filename = RUNS_DIR / f"run_{timestamp}.json"
     with open(filename, "w") as f3:
         json.dump(state, f3, indent=2)
-    return filename
+    return str(filename)
