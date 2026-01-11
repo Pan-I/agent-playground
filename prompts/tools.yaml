@@ -1,0 +1,15 @@
+write_file:
+  fn: workflow_tools.write_file
+  description: "Write content to a file at the specified path."
+  schema:
+    path: str
+    content: str
+search:
+  fn: search_tools.search
+  description: "Search for information using a query."
+  schema:
+    query: str
+  optional_schema:
+    top_k: int
+  defaults:
+    top_k: 5

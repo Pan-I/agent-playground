@@ -7,25 +7,29 @@ from script_files.llm_agent_scripts.llm_provider import get_llm_provider
 from script_files.tools import search_tools
 from script_files.tools import workflow_tools
 
+
 # Standard tools definition
-TOOLS = {
-    "write_file": {
-        "fn": workflow_tools.write_file,
-        "schema": {
-            "path": str,
-            "content": str,
-        }
-    },
-    "search": {
-        "fn": search_tools.search,
-        "schema": {
-            "query": str,
-        },
-        "optional_schema": {
-            "top_k": int
-        }
+def _get_tools():
+    with open(workflow_tools.PROMPTS_DIR / "tools.yaml") as f:
+        config = yaml.safe_load(f)
+
+    # Map tool names to actual functions
+    tool_functions = {
+        "write_file": workflow_tools.write_file,
+        "search": search_tools.search,
     }
-}
+
+    tools = {}
+    for name, details in config.items():
+        if name in tool_functions:
+            tools[name] = {
+                **details,
+                "fn": tool_functions[name]
+            }
+    return tools
+
+
+TOOLS = _get_tools()
 
 # Global LLM provider instance
 llm = get_llm_provider()
@@ -45,10 +49,10 @@ class Agent:
         self.max_search = max_search
 
         # Load and cache prompts during initialization
-        self.system_prompt = self._load_system_prompt()
+        self.system_prompt = self._load_system_prompt(self.tools)
 
     @staticmethod
-    def _load_system_prompt() -> str:
+    def _load_system_prompt(tools: Dict[str, Any]) -> str:
         """Loads system and user prompts and merges them, extracting the system prompt string."""
         with open(workflow_tools.PROMPTS_DIR / "prompt.yaml") as f:
             prompt_data = yaml.safe_load(f)
@@ -56,7 +60,25 @@ class Agent:
             system_prompt_data = yaml.safe_load(f)
 
         full_prompt = workflow_tools.merge_prompts(system_prompt_data, prompt_data)
-        return full_prompt.get('system_prompt', '')
+        system_prompt = full_prompt.get('system_prompt', '')
+
+        # Format tools for the prompt
+        # Create a copy without the 'fn' key (which is a Python object)
+        clean_tools = {}
+        for name, details in tools.items():
+            clean_tools[name] = {k: v for k, v in details.items() if k != 'fn'}
+
+        tools_description = yaml.dump(clean_tools, sort_keys=False)
+        # Indent the tools description for the prompt, except for the first line
+        # which will be indented by the placeholder's indentation in the template.
+        indented_tools = "\n".join(["  " + line for line in tools_description.splitlines()]).lstrip()
+
+        # Format the allowed tools list
+        tools_list = "\n".join([f"  - {name}" for name in clean_tools.keys()]).lstrip()
+
+        return (system_prompt
+                .replace("{tools_definition}", indented_tools)
+                .replace("{tools_list}", tools_list))
 
     def _format_prompt(self, state: Dict[str, Any]) -> str:
         """Formats the prompt for the LLM based on the current state."""

@@ -17,33 +17,11 @@ system_prompt: |
     }
   }
   
-  The tools list you are able to call must follow this schema for python:
-  
-  TOOLS = {
-      "write_file": {
-          "fn": workflow_tools.write_file,
-          "schema": {
-              "path": str,
-              "content": str,
-          }
-      },
-      "search": {
-          "fn": search_tools.search,
-          "schema": {
-              "query": str,
-          },
-          "optional_schema": {
-              "top_k": int
-          },
-          "defaults": {
-              "top_k": 5
-          }
-      }
-  }
-  
+  The tools you are able to call:
+  {tools_definition}
+
   The only allowed tools are:
-  - write_file
-  - search
+  {tools_list}
 
   If no tool is appropriate, respond with type "done" and provide the result directly.
 
