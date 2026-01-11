@@ -4,9 +4,9 @@ A small repo to try learning using API calls to LLM/Gen-AI services. It features
 
 ## Features
 
-- **Autonomous Agent**: Core logic in `agent.py` that implements a "Think-Act-Observe" loop.
-- **LLM Abstraction**: Supports multiple LLM providers (currently focused on OpenAI).
-- **Tool Use**: Extensible tool system (e.g., file writing, stubbed search).
+- **Autonomous Agent**: Core logic in [`agent.py`](https://github.com/Pan-I/agent-playground/blob/main/script_files/llm_agent_scripts/agent.py) that implements a "Think-Act-Observe" loop.
+- **LLM Abstraction**: [`llm_provider.py`](https://github.com/Pan-I/agent-playground/blob/main/script_files/llm_agent_scripts/llm_provider.py) supports multiple LLM providers (currently focused on OpenAI).
+- **Tool Use**: Extensible tool system [(e.g., file writing, stubbed search)](https://github.com/Pan-I/agent-playground/tree/main/script_files/tools).
 - **Logging**: Comprehensive logging of agent steps and tool results in the `runs/` directory.
 
 ## Prerequisites
