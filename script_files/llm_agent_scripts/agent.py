@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 import yaml
 
 from script_files.llm_agent_scripts.llm_provider import get_llm_provider
+from script_files.tools import form_tools
 from script_files.tools import search_tools
 from script_files.tools import workflow_tools
 
@@ -17,6 +18,7 @@ def _get_tools():
     tool_functions = {
         "write_file": workflow_tools.write_file,
         "search": search_tools.search,
+        "generate_ui_form": form_tools.generate_ui_form,
     }
 
     tools = {}

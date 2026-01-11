@@ -13,3 +13,8 @@ search:
     top_k: int
   defaults:
     top_k: 5
+generate_ui_form:
+  fn: form_tools.generate_ui_form
+  description: "Generate an HTML form based on a list of field specifications. Each field should be a dictionary with 'name', 'label', and 'type'."
+  schema:
+    fields: list
